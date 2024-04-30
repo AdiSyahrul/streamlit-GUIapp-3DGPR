@@ -12,6 +12,7 @@ def add_vertical_noise(data, noise_ratio=0.3, line_width=3):
     x_dim, y_dim, z_dim = noisy_data.shape
     num_noisy_lines = int((y_dim * noise_ratio) / line_width)
     noise_color = np.min(noisy_data)
+    # noise_color = np.percentile(noisy_data[noisy_data > 0], 25)
     start_cols = np.random.choice(y_dim - line_width + 1, num_noisy_lines, replace=False)
 
     for start_col in start_cols:
@@ -62,7 +63,8 @@ def create_slice_plots(data, axis, start_slice, num_slices):
 #     # reconstructed_data = model.predict(np.expand_dims(noisy_data, axis=0))[0]
 #     reconstructed_data = model.predict(noisy_data)
 #     return reconstructed_data
-
+def normalize_data(data):
+    return (data - np.min(data)) / (np.max(data) - np.min(data))
 # Main function
 def main():
     st.title("3D Mesh and Slice Visualization")
@@ -70,13 +72,15 @@ def main():
     if uploaded_file is not None:
         st.write("File uploaded successfully!")
         single_data = loadmat(uploaded_file)['noisy_data']
-        
+        normalized_data = normalize_data(single_data)
         # Add noise to the uploaded data
-        noisy_data = add_vertical_noise(single_data)
+        noisy_data = add_vertical_noise(normalized_data)
+        noise_data = add_vertical_noise(single_data)
 
         # 3D Noisy
         st.subheader("3D Mesh Noisy Visualization")
-        verts, faces, _, _ = marching_cubes(noisy_data)
+        # level = np.mean(noisy_data)
+        verts, faces, _, _ = marching_cubes(noise_data)
         mesh = create_3d_mesh_plot(verts, faces)
         fig = go.Figure(data=[mesh])
         st.plotly_chart(fig)
@@ -93,16 +97,23 @@ def main():
         fig_reconstructed = go.Figure(data=[mesh_reconstructed])
         st.plotly_chart(fig_reconstructed)
 
-        # # Get user input for slice axis and index and display 2D visualization
-        # st.subheader("2D Slice Visualization")
-        # axis = st.selectbox("Select slice axis", ['x', 'y', 'z'])
-        # start_slice = st.slider(f"Select start slice index along {axis} axis", 0, single_data.shape[0]-1, single_data.shape[0]//2)
-        # num_slices = st.slider(f"Select number of slices to display", 1, 10, 5)
+        # Maximum Intensity Projection (MIP) of the original data
+        mip_original = np.max(normalized_data, axis=2)
+        mip_noisy = np.max(noisy_data, axis=2)
+        mip_reconstructed = np.max(reconstructed_data, axis=2)
+        # mip_original_normalized = (mip_original - np.min(mip_original)) / (np.max(mip_original) - np.min(mip_original))
+        # mip_noisy_normalized = (mip_noisy - np.min(mip_noisy)) / (np.max(mip_noisy) - np.min(mip_noisy))
+        # mip_reconstructed_normalized = (mip_reconstructed - np.min(mip_reconstructed)) / (np.max(mip_reconstructed) - np.min(mip_reconstructed))
 
-        # slice_plots = create_slice_plots(single_data, axis, start_slice, num_slices)
-        # for i, slice_plot in enumerate(slice_plots):
-        #     st.subheader(f"{axis.upper()} Slice {start_slice + i}")
-        #     st.plotly_chart(slice_plot)
+        #  Display MIPs
+        st.subheader("Original Data MIP")
+        st.image(mip_original, use_column_width=True, caption="Maximum Intensity Projection of the Original Data")
+
+        st.subheader("Noisy Data MIP")
+        st.image(mip_noisy, use_column_width=True, caption="Maximum Intensity Projection of the Noisy Data")
+
+        st.subheader("Reconstructed Data MIP")
+        st.image(mip_reconstructed, use_column_width=True, caption="Maximum Intensity Projection of the Reconstructed Data")
 
 if __name__ == "__main__":
     main()
