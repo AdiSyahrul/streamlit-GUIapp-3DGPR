@@ -3,5 +3,5 @@ numpy
 scipy
 scikit-image
 plotly
-tensorflow==3.9.19
+tensorflow==2.15.0
 matplotlib
