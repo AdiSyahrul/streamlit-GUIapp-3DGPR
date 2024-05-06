@@ -7,6 +7,11 @@ import plotly.graph_objects as go
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
+def list_models(directory='dataset'):
+    """List all model files in the specified directory"""
+    model_files = [f for f in os.listdir(directory) if f.endswith('.h5')]
+    return model_files
+
 def add_vertical_noise(data, noise_ratio=0.3, line_width=3):
     noisy_data = data.copy()
     x_dim, y_dim, z_dim = noisy_data.shape
@@ -56,6 +61,8 @@ def normalize_data(data):
 def main():
     st.title("3D Mesh and Slice Visualization")
     uploaded_file = st.file_uploader("Upload a .mat file", type="mat")
+    model_files = list_models()
+    selected_model = st.selectbox("Select a model for reconstruction", model_files)
     if uploaded_file is not None:
         st.write("File uploaded successfully!")
         single_data = loadmat(uploaded_file)['noisy_data']
@@ -67,10 +74,10 @@ def main():
         if not contains_noise:
                 # Add noise to the data
                 # noisy_data = add_vertical_noise(normalized_data)
-                noise_data = add_vertical_noise(single_data)
 
                 # 3D Noisy Visualization
                 st.subheader("3D Mesh Noisy Visualization")
+                noise_data = add_vertical_noise(single_data)
                 verts, faces, _, _ = marching_cubes(noise_data)
                 mesh = create_3d_mesh_plot(verts, faces)
                 fig = go.Figure(data=[mesh])
@@ -84,7 +91,9 @@ def main():
             st.plotly_chart(fig)
 
         # 3D Reconstruction
-        model = tf.keras.models.load_model('dataset/model3tes2.h5')
+        model_path = os.path.join('dataset', selected_model)
+        model = tf.keras.models.load_model(model_path)
+        # model = tf.keras.models.load_model('dataset/model3tes3.h5')
         reconstructed_data = model.predict(np.expand_dims(noise_data, axis=0))[0]
         reconstructed_data = np.squeeze(reconstructed_data)
         print("New shape of reconstructed data:", reconstructed_data.shape)
@@ -95,27 +104,27 @@ def main():
         fig_reconstructed = go.Figure(data=[mesh_reconstructed])
         st.plotly_chart(fig_reconstructed)
 
-        st.subheader("2D Visualization")
-        axis = st.selectbox("Select axis for 2D slice visualization", ['x', 'y', 'z'])
-        if axis == 'z':
-            mip_original = np.max(normalize_data(single_data), axis=0)
-            mip_noisy = np.max(normalize_data(noise_data), axis=0)
-            mip_reconstructed = np.max(reconstructed_data, axis=0)
-        elif axis == 'y':
-            mip_original = np.max(normalize_data(single_data), axis=1)
-            mip_noisy = np.max(normalize_data(noise_data), axis=1)
-            mip_reconstructed = np.max(reconstructed_data, axis=1)
-        elif axis == 'x':
-            mip_original = np.max(normalize_data(single_data), axis=2)
-            mip_noisy = np.max(normalize_data(noise_data), axis=2)
-            mip_reconstructed = np.max(reconstructed_data, axis=2)
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.image(mip_original, use_column_width=True, caption="Original Data")
-        with col2:
-            st.image(mip_noisy, use_column_width=True, caption="Noisy Data")
-        with col3:
-            st.image(mip_reconstructed, use_column_width=True, caption="Reconstructed Data")
+        # st.subheader("2D Visualization")
+        # axis = st.selectbox("Select axis for 2D slice visualization", ['x', 'y', 'z'])
+        # if axis == 'z':
+        #     mip_original = np.max(normalize_data(single_data), axis=0)
+        #     mip_noisy = np.max(normalize_data(noise_data), axis=0)
+        #     mip_reconstructed = np.max(reconstructed_data, axis=0)
+        # elif axis == 'y':
+        #     mip_original = np.max(normalize_data(single_data), axis=1)
+        #     mip_noisy = np.max(normalize_data(noise_data), axis=1)
+        #     mip_reconstructed = np.max(reconstructed_data, axis=1)
+        # elif axis == 'x':
+        #     mip_original = np.max(normalize_data(single_data), axis=2)
+        #     mip_noisy = np.max(normalize_data(noise_data), axis=2)
+        #     mip_reconstructed = np.max(reconstructed_data, axis=2)
+        # col1, col2, col3 = st.columns(3)
+        # with col1:
+        #     st.image(mip_original, use_column_width=True, caption="Original Data")
+        # with col2:
+        #     st.image(mip_noisy, use_column_width=True, caption="Noisy Data")
+        # with col3:
+        #     st.image(mip_reconstructed, use_column_width=True, caption="Reconstructed Data")
 
 if __name__ == "__main__":
     main()
