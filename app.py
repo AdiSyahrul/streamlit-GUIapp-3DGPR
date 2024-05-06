@@ -94,7 +94,13 @@ def main():
         model_path = os.path.join('dataset', selected_model)
         model = tf.keras.models.load_model(model_path)
         # model = tf.keras.models.load_model('dataset/model3tes3.h5')
-        reconstructed_data = model.predict(np.expand_dims(noise_data, axis=0))[0]
+        try:
+            reconstructed_data = model.predict(np.expand_dims(noise_data, axis=0))[0]
+        except Exception as e:
+            st.error(f"Error during model prediction: {str(e)}")
+            return  # Optionally return from the function if the error is critical
+
+        # reconstructed_data = model.predict(np.expand_dims(noise_data, axis=0))[0]
         reconstructed_data = np.squeeze(reconstructed_data)
         print("New shape of reconstructed data:", reconstructed_data.shape)
 
