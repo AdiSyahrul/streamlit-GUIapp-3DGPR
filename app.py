@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import numpy as np
-from scipy.io import loadmat
+from scipy.io import loadmat, savemat
 from skimage.measure import marching_cubes
 import plotly.graph_objects as go
 import tensorflow as tf
@@ -58,13 +58,20 @@ def create_slice_plots(data, axis, start_slice, num_slices):
 def normalize_data(data):
     return (data - np.min(data)) / (np.max(data) - np.min(data))
 
+def save_file(data, base_filename):
+    """Save reconstructed data with a new filename based on the uploaded file name."""
+    output_filename = 'reconstructed_' + base_filename + '.mat'
+    savemat(output_filename, {'reconstructed_data': data})
+    return output_filename
+
 def main():
     st.title("3D Mesh and Slice Visualization")
     uploaded_file = st.file_uploader("Upload a .mat file", type="mat")
     model_files = list_models()
     selected_model = st.selectbox("Select a model for reconstruction", model_files)
     if uploaded_file is not None:
-        st.write("File uploaded successfully!")
+        base_filename = os.path.splitext(uploaded_file.name)[0]
+        st.write(f"File uploaded successfully: {uploaded_file.name}")
         single_data = loadmat(uploaded_file)['noisy_data']
         # normalized_data = normalize_data(single_data)
         # noisy_data = add_vertical_noise(normalized_data)
@@ -98,17 +105,19 @@ def main():
             reconstructed_data = model.predict(np.expand_dims(noise_data, axis=0))[0]
         except Exception as e:
             st.error(f"Error during model prediction: {str(e)}")
-            return  # Optionally return from the function if the error is critical
+            return
 
         # reconstructed_data = model.predict(np.expand_dims(noise_data, axis=0))[0]
         reconstructed_data = np.squeeze(reconstructed_data)
         print("New shape of reconstructed data:", reconstructed_data.shape)
-
         st.subheader("Reconstructed Data")
         verts_reconstructed, faces_reconstructed, _, _ = marching_cubes(reconstructed_data)
         mesh_reconstructed = create_3d_mesh_plot(verts_reconstructed, faces_reconstructed)
         fig_reconstructed = go.Figure(data=[mesh_reconstructed])
         st.plotly_chart(fig_reconstructed)
+        if st.button('Save Reconstructed Data'):
+            save_path = save_file(reconstructed_data, base_filename)
+            st.success(f'Reconstructed data saved successfully at {save_path}!')
 
         # st.subheader("2D Visualization")
         # axis = st.selectbox("Select axis for 2D slice visualization", ['x', 'y', 'z'])
