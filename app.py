@@ -6,6 +6,8 @@ from skimage.measure import marching_cubes
 import plotly.graph_objects as go
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from skimage.metrics import peak_signal_noise_ratio as psnr
+from skimage.metrics import structural_similarity as ssim
 
 def list_models(directory='dataset'):
     """List all model files in the specified directory"""
@@ -62,7 +64,11 @@ def save_file(data, base_filename):
     output_filename = 'reconstructed_' + base_filename + '.mat'
     savemat(output_filename, {'reconstructed_data': data})
     return output_filename
-
+def calculate_psnr(original_data, reconstructed_data):
+    mse = np.mean((original_data - reconstructed_data) ** 2)
+    max_i = np.max(np.abs(original_data))
+    psnr = 20 * np.log10(max_i / np.sqrt(mse))
+    return psnr
 def main():
     st.title("3D GPR Visualization")
     uploaded_file = st.file_uploader("Upload a .mat file", type="mat")
@@ -74,14 +80,14 @@ def main():
         st.write(f"File uploaded successfully: {uploaded_file.name}")
         single_data = loadmat(uploaded_file)['noisy_data']
         contains_noise = np.max(single_data) > 1.0
+        # 3D Original
+        # st.subheader("3D Original")
+        # verts_ori, faces_ori, _, _ = marching_cubes(single_data)
+        # ori = create_3d_mesh_plot(verts_ori, faces_ori)
+        # fig = go.Figure(data=[ori])
+        # st.plotly_chart(fig)
 
         if not contains_noise:
-                # # 3D Original
-                # st.subheader("3D Original")
-                # verts_ori, faces_ori, _, _ = marching_cubes(single_data)
-                # ori = create_3d_mesh_plot(verts_ori, faces_ori)
-                # fig = go.Figure(data=[ori])
-                # st.plotly_chart(fig)
                 # 3D Noisy Visualization
                 st.subheader("3D Noisy")
                 noise_data = add_vertical_noise(single_data)
@@ -113,6 +119,16 @@ def main():
         mesh_reconstructed = create_3d_mesh_plot(verts_reconstructed, faces_reconstructed)
         fig_reconstructed = go.Figure(data=[mesh_reconstructed])
         st.plotly_chart(fig_reconstructed)
+        normal = normalize_data(single_data)
+        rec = normalize_data(reconstructed_data)
+        st.write(f"Max Ori :{ np.max(single_data)}")
+        st.write(f"Min Ori :{ np.min(single_data)}")
+        st.write(f"Max Rec :{ np.max(reconstructed_data)}")
+        st.write(f"Min Rec :{ np.min(reconstructed_data)}")
+        psnr_value = calculate_psnr(normal, rec)
+        st.write(f"PSNR: {psnr_value:.2f}")
+        st.write(f"max_i: {np.max(np.abs(normal))}")
+        st.write(f"mse: {np.mean((normal - rec) ** 2)}")
         if st.button('Save Reconstructed Data'):
             save_path = save_file(reconstructed_data, base_filename)
             st.success(f'Reconstructed data saved successfully at {save_path}!')
