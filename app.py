@@ -34,7 +34,7 @@ def load_file(directory, filename):
 def create_3d_mesh_plot(points, faces):
     x, y, z = points[:, 0], points[:, 1], points[:, 2]
     i, j, k = faces[:, 0], faces[:, 1], faces[:, 2]
-    mesh = go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, opacity=0.5, color='lightpink')
+    mesh = go.Mesh3d(x=x, y=y, z=z, i=i, j=j, k=k, opacity=0.5, color='crimson')
     return mesh
 
 def create_slice_plots(data, axis, start_slice, num_slices):
@@ -68,6 +68,7 @@ def main():
     uploaded_file = st.file_uploader("Upload a .mat file", type="mat")
     model_files = list_models()
     selected_model = st.selectbox("Select a model for reconstruction", model_files)
+
     if uploaded_file is not None:
         base_filename = os.path.splitext(uploaded_file.name)[0]
         st.write(f"File uploaded successfully: {uploaded_file.name}")
@@ -75,8 +76,14 @@ def main():
         contains_noise = np.max(single_data) > 1.0
 
         if not contains_noise:
+                # # 3D Original
+                # st.subheader("3D Original")
+                # verts_ori, faces_ori, _, _ = marching_cubes(single_data)
+                # ori = create_3d_mesh_plot(verts_ori, faces_ori)
+                # fig = go.Figure(data=[ori])
+                # st.plotly_chart(fig)
                 # 3D Noisy Visualization
-                st.subheader("3D Mesh Noisy Visualization")
+                st.subheader("3D Noisy")
                 noise_data = add_vertical_noise(single_data)
                 verts, faces, _, _ = marching_cubes(noise_data)
                 mesh = create_3d_mesh_plot(verts, faces)
@@ -84,7 +91,7 @@ def main():
                 st.plotly_chart(fig)
         else:
             # 3D Noise Visualization
-            st.subheader("3D Mesh Noisy Visualization")
+            st.subheader("3D Noisy")
             verts, faces, _, _ = marching_cubes(single_data)
             mesh = create_3d_mesh_plot(verts, faces)
             fig = go.Figure(data=[mesh])
@@ -101,7 +108,7 @@ def main():
             return
         reconstructed_data = np.squeeze(reconstructed_data)
         print("New shape of reconstructed data:", reconstructed_data.shape)
-        st.subheader("Reconstructed Data")
+        st.subheader("3D Reconstructed Data")
         verts_reconstructed, faces_reconstructed, _, _ = marching_cubes(reconstructed_data)
         mesh_reconstructed = create_3d_mesh_plot(verts_reconstructed, faces_reconstructed)
         fig_reconstructed = go.Figure(data=[mesh_reconstructed])
