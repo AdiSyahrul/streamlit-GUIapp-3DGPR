@@ -16,7 +16,6 @@ def add_vertical_noise(data, noise_ratio=0.3, line_width=3):
     noisy_data = data.copy()
     x_dim, y_dim, z_dim = noisy_data.shape
     num_noisy_lines = int((y_dim * noise_ratio) / line_width)
-    # noise_color = np.min(noisy_data)
     noise_color = np.median(noisy_data[noisy_data < 0])
     start_cols = np.random.choice(y_dim - line_width + 1, num_noisy_lines, replace=False)
 
@@ -65,7 +64,7 @@ def save_file(data, base_filename):
     return output_filename
 
 def main():
-    st.title("3D Mesh and Slice Visualization")
+    st.title("3D GPR Visualization")
     uploaded_file = st.file_uploader("Upload a .mat file", type="mat")
     model_files = list_models()
     selected_model = st.selectbox("Select a model for reconstruction", model_files)
@@ -73,15 +72,9 @@ def main():
         base_filename = os.path.splitext(uploaded_file.name)[0]
         st.write(f"File uploaded successfully: {uploaded_file.name}")
         single_data = loadmat(uploaded_file)['noisy_data']
-        # normalized_data = normalize_data(single_data)
-        # noisy_data = add_vertical_noise(normalized_data)
-        # noise_data = add_vertical_noise(single_data)
         contains_noise = np.max(single_data) > 1.0
 
         if not contains_noise:
-                # Add noise to the data
-                # noisy_data = add_vertical_noise(normalized_data)
-
                 # 3D Noisy Visualization
                 st.subheader("3D Mesh Noisy Visualization")
                 noise_data = add_vertical_noise(single_data)
@@ -106,8 +99,6 @@ def main():
         except Exception as e:
             st.error(f"Error during model prediction: {str(e)}")
             return
-
-        # reconstructed_data = model.predict(np.expand_dims(noise_data, axis=0))[0]
         reconstructed_data = np.squeeze(reconstructed_data)
         print("New shape of reconstructed data:", reconstructed_data.shape)
         st.subheader("Reconstructed Data")
