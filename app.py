@@ -6,8 +6,8 @@ from skimage.measure import marching_cubes
 import plotly.graph_objects as go
 import tensorflow as tf
 import matplotlib.pyplot as plt
-from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import structural_similarity as ssim
+import time
 
 def list_models(directory='dataset'):
     """List all model files in the specified directory"""
@@ -58,95 +58,78 @@ def create_slice_plots(data, axis, start_slice, num_slices):
 
 def normalize_data(data):
     return (data - np.min(data)) / (np.max(data) - np.min(data))
-
 def save_file(data, base_filename):
     """Save reconstructed data with a new filename based on the uploaded file name."""
     output_filename = 'reconstructed_' + base_filename + '.mat'
     savemat(output_filename, {'reconstructed_data': data})
     return output_filename
-def calculate_psnr(original_data, reconstructed_data):
-    mse = np.mean((original_data - reconstructed_data) ** 2)
-    max_i = np.max(np.abs(original_data))
-    psnr = 20 * np.log10(max_i / np.sqrt(mse))
+def calculate_psnr(original_data, reconstructed_data, ):
+    mse = np.mean((original_data - reconstructed_data) ** 4)
+    psnr = 20 * np.log10(1.0/np.sqrt(mse))
     return psnr
+def calculate_ssim(original_data, reconstructed_data):
+    ssim_value = ssim(original_data, reconstructed_data, data_range=reconstructed_data.max() - reconstructed_data.min(), multichannel=True)
+    return ssim_value
+
 def main():
     st.title("3D GPR Visualization")
     uploaded_file = st.file_uploader("Upload a .mat file", type="mat")
     model_files = list_models()
     selected_model = st.selectbox("Select a model for reconstruction", model_files)
-
+    is_noisy = st.checkbox("Uploaded file already has noise")
     if uploaded_file is not None:
-        base_filename = os.path.splitext(uploaded_file.name)[0]
-        st.write(f"File uploaded successfully: {uploaded_file.name}")
-        single_data = loadmat(uploaded_file)['noisy_data']
-        contains_noise = np.max(single_data) > 1.0
-        # 3D Original
-        # st.subheader("3D Original")
-        # verts_ori, faces_ori, _, _ = marching_cubes(single_data)
-        # ori = create_3d_mesh_plot(verts_ori, faces_ori)
-        # fig = go.Figure(data=[ori])
-        # st.plotly_chart(fig)
-
-        if not contains_noise:
-                # 3D Noisy Visualization
-                st.subheader("3D Noisy")
-                noise_data = add_vertical_noise(single_data)
-                verts, faces, _, _ = marching_cubes(noise_data)
-                mesh = create_3d_mesh_plot(verts, faces)
-                fig = go.Figure(data=[mesh])
-                st.plotly_chart(fig)
+        data = loadmat(uploaded_file)['noisy_data']
+        normalized_data = normalize_data(data)
+        if not is_noisy:
+            noise_data = add_vertical_noise(data)
         else:
-            # 3D Noise Visualization
-            st.subheader("3D Noisy")
-            verts, faces, _, _ = marching_cubes(single_data)
-            mesh = create_3d_mesh_plot(verts, faces)
-            fig = go.Figure(data=[mesh])
-            st.plotly_chart(fig)
-
-        # 3D Reconstruction
+            noise_data = data
+        # noisy_data = add_vertical_noise(normalized_data)
+        # noise_data = add_vertical_noise(data)
         model_path = os.path.join('dataset', selected_model)
         model = tf.keras.models.load_model(model_path)
-        # model = tf.keras.models.load_model('dataset/model3tes3.h5')
-        try:
-            reconstructed_data = model.predict(np.expand_dims(noise_data, axis=0))[0]
-        except Exception as e:
-            st.error(f"Error during model prediction: {str(e)}")
-            return
-        reconstructed_data = np.squeeze(reconstructed_data)
-        print("New shape of reconstructed data:", reconstructed_data.shape)
-        st.subheader("3D Reconstructed Data")
-        verts_reconstructed, faces_reconstructed, _, _ = marching_cubes(reconstructed_data)
-        mesh_reconstructed = create_3d_mesh_plot(verts_reconstructed, faces_reconstructed)
-        fig_reconstructed = go.Figure(data=[mesh_reconstructed])
-        st.plotly_chart(fig_reconstructed)
-        normal = normalize_data(single_data)
-        rec = normalize_data(reconstructed_data)
-        st.write(f"Max Ori :{ np.max(single_data)}")
-        st.write(f"Min Ori :{ np.min(single_data)}")
-        st.write(f"Max Rec :{ np.max(reconstructed_data)}")
-        st.write(f"Min Rec :{ np.min(reconstructed_data)}")
-        psnr_value = calculate_psnr(normal, rec)
-        st.write(f"PSNR: {psnr_value:.2f}")
-        st.write(f"max_i: {np.max(np.abs(normal))}")
-        st.write(f"mse: {np.mean((normal - rec) ** 2)}")
-        if st.button('Save Reconstructed Data'):
-            save_path = save_file(reconstructed_data, base_filename)
-            st.success(f'Reconstructed data saved successfully at {save_path}!')
 
+        start_time = time.time()
+        reconstructed_data = model.predict(np.expand_dims(noise_data, axis=0))
+        prediction_time = time.time() - start_time
+        reconstructed_data = np.squeeze(reconstructed_data)
+        # 3D Noisy #
+        st.markdown("<h2 style='text-align: center;'>3D Noisy</h2>", unsafe_allow_html=True)
+        # level_noisy = np.mean(noise_data)
+        level_noisy = np.percentile(noise_data, 75)
+        # level_noisy = np.percentile(noisy_data, 75)
+        verts_noisy, faces_noisy, _, _ = marching_cubes(noise_data, level=level_noisy)
+        mesh_noisy = create_3d_mesh_plot(verts_noisy, faces_noisy)
+        st.plotly_chart(go.Figure(data=[mesh_noisy]), use_container_width=True)
+
+        # 3D Reconstructed #
+        st.markdown("<h2 style='text-align: center;'>3D Reconstructed</h2>", unsafe_allow_html=True)
+        level_reconstructed = np.percentile(reconstructed_data, 75)
+        verts_rec, faces_rec, _, _ = marching_cubes(reconstructed_data, level=level_reconstructed)
+        mesh_rec = create_3d_mesh_plot(verts_rec, faces_rec)
+        st.plotly_chart(go.Figure(data=[mesh_rec]), use_container_width=True)
+        
+        rec = normalize_data(reconstructed_data)
+        # st.write(f"Prediction time: {prediction_time:.2f} seconds")
+        if not is_noisy:
+            psnr_value = calculate_psnr(normalized_data, rec)
+            ssim_value = calculate_ssim(normalized_data, rec)
+            st.write(f"PSNR Reconstructed: {psnr_value:.2f}")
+            st.write(f"SSIM Reconstructed: {ssim_value:.2f}")
         # st.subheader("2D Visualization")
         # axis = st.selectbox("Select axis for 2D slice visualization", ['x', 'y', 'z'])
         # if axis == 'z':
-        #     mip_original = np.max(normalize_data(single_data), axis=0)
+        #     mip_original = np.max(normalized_data, axis=0)
         #     mip_noisy = np.max(normalize_data(noise_data), axis=0)
-        #     mip_reconstructed = np.max(reconstructed_data, axis=0)
+        #     mip_reconstructed = np.max(rec, axis=0)
         # elif axis == 'y':
-        #     mip_original = np.max(normalize_data(single_data), axis=1)
+        #     mip_original = np.max(normalized_data, axis=1)
         #     mip_noisy = np.max(normalize_data(noise_data), axis=1)
-        #     mip_reconstructed = np.max(reconstructed_data, axis=1)
+        #     mip_reconstructed = np.max(rec, axis=1)
         # elif axis == 'x':
-        #     mip_original = np.max(normalize_data(single_data), axis=2)
+        #     mip_original = np.max(normalized_data, axis=2)
         #     mip_noisy = np.max(normalize_data(noise_data), axis=2)
-        #     mip_reconstructed = np.max(reconstructed_data, axis=2)
+        #     mip_reconstructed = np.max(rec, axis=2)
         # col1, col2, col3 = st.columns(3)
         # with col1:
         #     st.image(mip_original, use_column_width=True, caption="Original Data")
@@ -154,7 +137,5 @@ def main():
         #     st.image(mip_noisy, use_column_width=True, caption="Noisy Data")
         # with col3:
         #     st.image(mip_reconstructed, use_column_width=True, caption="Reconstructed Data")
-
 if __name__ == "__main__":
     main()
-
